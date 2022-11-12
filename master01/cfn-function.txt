@@ -1,1 +1,0 @@
-!Sub $(AWS::StackName) : cfnのスタック名
