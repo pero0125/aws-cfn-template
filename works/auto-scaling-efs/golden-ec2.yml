@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: this is auto-scaling template
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+  
+  LatestAmiId:
+    Description: the ID of the region-specific AMI 
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  InstanceType:
+    Description: Amazon EC2 instance type to use for your instances.
+    Type: String
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.micro
+      - t3.small
+      - t3.medium
+    Default: t2.micro
+
+Resources: 
+  # Auto-scaling group
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: golden-ec2
+      ImageId: !Ref 'LatestAmiId'
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "True"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !ImportValue
+                Fn::Sub: ${NetworkStackName}-EC2-SecurityGroup
+          SubnetId: !ImportValue 
+              Fn::Sub: ${NetworkStackName}-Public3Subnet
+      InstanceType: !Ref 'InstanceType'
+      Tags:
+        - Key: key
+          Value: value
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y aws-cfn-bootstrap cloud-init aws-cli amazon-efs-utils
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region} --configsets ec2_setup
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+    Metadata:
+      Comment: install a simple nginx
+      AWS::CloudFormation::Init:
+        configSets:
+          ec2_setup:
+            - install_cfn_hup
+            - install_packages
+            - efs_configure
+            - nginx_configure
+        install_cfn_hup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                interval=2
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              group: root
+              mode: "000400"
+              owner: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.LaunchTemplate.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchTemplate --configsets install --region ${AWS::Region}
+              group: root
+              mode: "000400"
+              owner: root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        install_packages:
+          commands:
+            01_install_nginx:
+              command: "sudo amazon-linux-extras install -y nginx1"
+            02_active_nginx:
+              command: "sudo systemctl start nginx"
+            03_active_nginx:
+              command: "sudo systemctl enable nginx"
+            04_install_efsutil:
+              command: "sudo yum install -y amazon-efs-utils"
+        efs_configure:
+          commands: 
+            01_chmod:
+              command: "sudo chmod 777 /etc/fstab"
+            02_make_dir:
+              command: "sudo mkdir /home/ec2-user/efs"
+            03_mount:
+              command: !Join 
+                        - ""
+                        - - "sudo mount -t efs "
+                          - !ImportValue 
+                              Fn::Sub: ${NetworkStackName}-EFS-DNS-Id
+                          - !Sub ".efs.${AWS::Region}.amazonaws.com:/ /home/ec2-user/efs"
+            04_auto_mount:
+              command: !Join 
+                        - ""
+                        - - "sudo echo "
+                          - !ImportValue 
+                              Fn::Sub: ${NetworkStackName}-EFS-DNS-Id
+                          - !Sub ".efs.${AWS::Region}.amazonaws.com:/ /home/ec2-user/efs nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0 >> /etc/fstab"
+        nginx_configure:
+          files:
+            /usr/share/nginx/html/index.html:
+              content: htmltest
+              group: root
+              mode: "000644"
+              owner: root
+          commands:
+            01_change_conf:
+              command: sudo sed -i 's/usr\/share\/nginx\/html/home\/ec2-user\/efs/g' /etc/nginx/nginx.conf
+            02_copy:
+              command: sudo cp -R /usr/share/nginx/html/* /home/ec2-user/efs/
+            03_chmod:
+              command: "sudo chmod 701 /home/ec2-user/"

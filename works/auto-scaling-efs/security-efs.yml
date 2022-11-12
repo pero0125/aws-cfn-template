@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: master template describing security group resources
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+
+Resources: 
+# security group
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ec2-SecurityGroup1
+      GroupDescription: for nginx
+      VpcId: !ImportValue
+        Fn::Sub: ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+          SourceSecurityGroupId: !Ref 'ElbSecurityGroup'
+        - FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-EC2-SecurityGroup
+
+  ElbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: elb-SecurityGroup
+      GroupDescription: for loadbalancer
+      VpcId: !ImportValue
+        Fn::Sub: ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-ELB-SecurityGroup
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: efs-SecurityGroup2
+      GroupDescription: for efs
+      VpcId: !ImportValue
+        Fn::Sub: ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - FromPort: 2049
+          IpProtocol: tcp
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref 'Ec2SecurityGroup'
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-EFS-SecurityGroup
+
+Outputs:
+  Ec2SecurityGroupId:
+    Description: EC2 application security group id
+    Value: !Ref Ec2SecurityGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-EC2-SecurityGroup
+
+  ElbSecurityGroupId:
+    Description: ELB application security group id
+    Value: !Ref ElbSecurityGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-ELB-SecurityGroup
+
+  EfsSecurityGroupId:
+    Description: Efs application security group id
+    Value: !Ref EfsSecurityGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-EFS-SecurityGroup

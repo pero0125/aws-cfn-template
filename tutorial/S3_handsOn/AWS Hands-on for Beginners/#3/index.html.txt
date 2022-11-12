@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>はじめての AWS</title> <!-- 修正 -->
+</head>
+<body>
+  <div>
+    <div class="msg">
+      このページでは、AWS について学んだことを書いていきます。<!-- 修正 -->
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,341 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This master template for network-topology with two public subnets and 2 private subunets , route tables, routes to the internet
+
+Parameters: 
+  NetworkStackName:
+    Description: this is a common layer stack name
+    Type: String
+    Default: test
+
+  AvailabilityZones:
+    Description: the list of availabilityzone to use for the subunets in the vpc
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+
+  VpcCider:
+    Description: the cider of vpc segment 
+    Type: String
+    Default: 10.0.0.0/16
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  Public1Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.1.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  Public2Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.2.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateWeb1Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.101.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateWeb2Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.102.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateDb1Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.201.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateDb2Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.202.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+Resources:
+# vpc
+  Vpc01:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCider
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-vpc01
+
+# internet gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-IG
+          
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc01
+      InternetGatewayId: !Ref InternetGateway
+
+# NAT gateway
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEip1.AllocationId
+      SubnetId: !Ref Public1Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGateway1
+
+  NatGatewayEip1:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGatewayEip1
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEip2.AllocationId
+      SubnetId: !Ref Public2Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGateway2
+
+  NatGatewayEip2:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGatewayEip2
+
+# public1subnet
+  Public1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref Public1Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public1subnet
+# public1routetable
+  Public1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public1routetable
+
+  Public1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Public1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Public1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Public1Subnet
+      RouteTableId: !Ref Public1RouteTable
+
+# public2subnet
+  Public2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref Public2Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public2subnet
+# public2routetable
+  Public2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public2routetable
+
+  Public2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Public2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Public2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Public2Subnet
+      RouteTableId: !Ref Public2RouteTable
+# ---------------------------------------------
+# private-web1-subnet
+  Private1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateWeb1Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private1subnet
+
+# private-web1-routetable
+  Private1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private1routetable
+
+# private-web1-route
+  NatGateway1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Private1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+# private-web1-route-routetable-associate
+  Private1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Private1Subnet
+      RouteTableId: !Ref Private1RouteTable
+# ---------------------------------------------
+# private-web2-subnet
+  Private2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateWeb2Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private2subnet
+
+# private-web-2routetable
+  Private2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private2routetable
+
+# private-web1-route
+  NatGateway2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Private2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+# private-web1-route-routetable-associate
+  Private2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Private2Subnet
+      RouteTableId: !Ref Private2RouteTable
+# ---------------------------------------------
+# private-db-1subnet
+  PrivateDb1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateDb1Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateDb1subnet
+
+# private-db-1routetable
+  PrivateDb1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateDb1routetable
+# ---------------------------------------------
+# private-db-2subnet
+  PrivateDb2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateDb2Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateDb2subnet
+
+# private-db-2routetable
+  PrivateDb2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateDb2routetable
+
+Outputs:
+  Vpc01:
+    Value: !Ref Vpc01
+    Export: 
+      Name: !Sub ${AWS::StackName}-VpcId
+  Public1Subnet:
+    Value: !Ref Public1Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-Public1Subnet
+  Public2Subnet:
+    Value: !Ref Public2Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-Public2Subnet
+  Private1Subnet:
+    Value: !Ref Private1Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-Private1Subnet
+  Private2Subnet:
+    Value: !Ref Private2Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-Private2Subnet
+  PrivateDb1Subnet:
+    Value: !Ref PrivateDb1Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-PrivateDb1Subnet
+  PrivateDb2Subnet:
+    Value: !Ref PrivateDb2Subnet
+    Export: 
+      Name: !Sub ${AWS::StackName}-PrivateDb2Subnet
+  StackName:
+    Description: output stackname
+    Value: !Ref NetworkStackName
+    Export: 
+      Name: !Ref StackName

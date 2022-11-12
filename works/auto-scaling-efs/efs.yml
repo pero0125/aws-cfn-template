@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: this is a template of efs
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+
+Resources:
+    EFSFileSystem:
+        Type: "AWS::EFS::FileSystem"
+        Properties:
+            PerformanceMode: "generalPurpose"
+            #Encrypted: true
+            #KmsKeyId: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/0e93a136-c19f-4ae7-9dc4-3aa19450e6f2"
+            ThroughputMode: "bursting"
+            FileSystemTags: 
+              - 
+                Key: "Name"
+                Value: "efs0125"
+
+    EFSMountTarget:
+        Type: "AWS::EFS::MountTarget"
+        Properties:
+            FileSystemId: !Ref EFSFileSystem
+            SecurityGroups: 
+              - !ImportValue
+                Fn::Sub: ${NetworkStackName}-EFS-SecurityGroup
+            SubnetId: !ImportValue 
+                      Fn::Sub: ${NetworkStackName}-Private1Subnet
+
+    EFSMountTarget2:
+        Type: "AWS::EFS::MountTarget"
+        Properties:
+            FileSystemId: !Ref EFSFileSystem
+            SecurityGroups: 
+              - !ImportValue
+                Fn::Sub: ${NetworkStackName}-EFS-SecurityGroup
+            SubnetId: !ImportValue 
+                      Fn::Sub: ${NetworkStackName}-Private2Subnet
+
+    EFSMountTarget3:
+        Type: "AWS::EFS::MountTarget"
+        Properties:
+            FileSystemId: !Ref EFSFileSystem
+            SecurityGroups: 
+              - !ImportValue
+                Fn::Sub: ${NetworkStackName}-EFS-SecurityGroup
+            SubnetId: !ImportValue 
+                      Fn::Sub: ${NetworkStackName}-Public3Subnet
+
+Outputs:
+  efsdns:
+    Description: infromation of efs dns
+    Value: !GetAtt EFSFileSystem.FileSystemId
+    Export: 
+      Name: !Sub ${NetworkStackName}-EFS-DNS-Id

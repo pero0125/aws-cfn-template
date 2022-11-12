@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>はじめての AWS</title>
+  <link rel="icon" href="favicon.ico"> <!-- 追加 -->
+  <link rel="stylesheet" href="css/styles.css"> <!-- 追加 -->
+</head>
+<body>
+  <div>
+    <div class="icon"> <!--追加: ここから-->
+      <img src="img/lambda.png">
+    </div> <!--追加: ここまで-->
+    <div class="msg">
+      このページでは、AWS について学んだことを書いていきます。
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This master template for network-topology with two public subnets and 2 private subunets , route tables, routes to the internet
+
+Parameters: 
+  NetworkStackName:
+    Description: this is a common layer stack name
+    Type: String
+    Default: test
+
+  AvailabilityZones:
+    Description: the list of availabilityzone to use for the subunets in the vpc
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+
+  VpcCider:
+    Description: the cider of vpc segment 
+    Type: String
+    Default: 10.0.0.0/16
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  Public1Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.1.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  Public2Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.2.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  Public3Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.3.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateWeb1Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.101.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+  PrivateWeb2Cider:
+    Description: the name of the vpc 
+    Type: String
+    Default: 10.0.102.0/24
+    AllowedPattern: ^([0-9]+\.){3}[0-9]+\/[0-9]+$
+    MaxLength: 18
+    MinLength: 9
+
+Resources:
+# vpc
+  Vpc01:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCider
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-vpc01
+
+# internet gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-IG
+          
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc01
+      InternetGatewayId: !Ref InternetGateway
+
+# public1subnet
+  Public1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref Public1Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public1subnet
+# public1routetable
+  Public1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public1routetable
+
+  Public1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Public1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Public1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Public1Subnet
+      RouteTableId: !Ref Public1RouteTable
+
+# public2subnet
+  Public2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref Public2Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public2subnet
+# public2routetable
+  Public2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public2routetable
+
+  Public2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Public2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Public2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Public2Subnet
+      RouteTableId: !Ref Public2RouteTable
+
+# public3subnet
+  Public3Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [2, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref Public3Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public3subnet
+# public3routetable
+  Public3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc01
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-public3routetable
+
+  Public3Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref Public3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Public3RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Public3Subnet
+      RouteTableId: !Ref Public3RouteTable
+# ---------------------------------------------
+# private-web1-subnet
+  Private1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateWeb1Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-Private1subnet
+
+# ---------------------------------------------
+# private-web2-subnet
+  Private2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      VpcId: !Ref Vpc01
+      CidrBlock: !Ref PrivateWeb2Cider
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-Private2subnet
+
+# ---------------------------------------------
+
+Outputs:
+  Vpc01:
+    Value: !Ref Vpc01
+    Export: 
+      Name: !Sub ${NetworkStackName}-VpcId
+  Public1Subnet:
+    Value: !Ref Public1Subnet
+    Export: 
+      Name: !Sub ${NetworkStackName}-Public1Subnet
+  Public2Subnet:
+    Value: !Ref Public2Subnet
+    Export: 
+      Name: !Sub ${NetworkStackName}-Public2Subnet
+  Public3Subnet:
+    Value: !Ref Public3Subnet
+    Export: 
+      Name: !Sub ${NetworkStackName}-Public3Subnet
+  Private1Subnet:
+    Value: !Ref Private1Subnet
+    Export: 
+      Name: !Sub ${NetworkStackName}-Private1Subnet
+  Private2Subnet:
+    Value: !Ref Private2Subnet
+    Export: 
+      Name: !Sub ${NetworkStackName}-Private2Subnet
+  StackName:
+    Description: output stackname
+    Value: !Ref NetworkStackName
+    Export: 
+      Name: !Ref NetworkStackName

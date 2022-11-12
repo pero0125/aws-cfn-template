@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: this is for the Loadbalancer template of the cloudformation
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+
+Resources: 
+  # target group
+  ElbTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+        HealthCheckIntervalSeconds: 30
+        HealthCheckPath: "/"
+        Port: 80
+        Protocol: "HTTP"
+        # HealthCheckPort: "traffic-port"
+        HealthCheckProtocol: "HTTP"
+        HealthCheckTimeoutSeconds: 5
+        UnhealthyThresholdCount: 2
+        # not use ip type with auto-scaling
+        TargetType: "instance"
+        Matcher: 
+            HttpCode: "200"
+        HealthyThresholdCount: 5
+        VpcId: !ImportValue 
+          Fn::Sub: ${NetworkStackName}-VpcId
+        Name: "for-alb"
+        HealthCheckEnabled: true
+
+  # main loadbalancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: alb
+      IpAddressType: ipv4
+      Type: application
+      # |internal|internet-facing|
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !ImportValue 
+            Fn::Sub: ${NetworkStackName}-ELB-SecurityGroup
+      Subnets:
+        - !ImportValue 
+            Fn::Sub: ${NetworkStackName}-Public1Subnet
+        - !ImportValue 
+            Fn::Sub: ${NetworkStackName}-Public2Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-ALB
+
+  # listener
+  ElbListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+        LoadBalancerArn: !Ref LoadBalancer
+        Port: 80
+        Protocol: "HTTP"
+        DefaultActions: 
+          - TargetGroupArn: !Ref ElbTargetGroup
+            Type: "forward"
+
+  # listener added rule
+  ElasticLoadBalancingV2ListenerRule:
+      Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+      Properties:
+          Priority: "1"
+          ListenerArn: !Ref ElbListener
+          # for path-based routing
+          Conditions: 
+            - Field: "path-pattern"
+              Values: 
+                - "/manage/*"
+          Actions: 
+            - Type: "forward"
+              TargetGroupArn: !Ref ElbTargetGroup
+              Order: 1
+              ForwardConfig: 
+                TargetGroups: 
+                  - TargetGroupArn: !Ref ElbTargetGroup
+                    Weight: 1
+                TargetGroupStickinessConfig: 
+                    Enabled: false
+
+Outputs:
+  ElbTargetGroup:
+    Description: ELB TargetGroup
+    Value: !Ref ElbTargetGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-ElbTargetGroup
+  DnsName:
+    Description: the DNS Name of LoadBalancer
+    Value: !GetAtt LoadBalancer.DNSName
+    Export: 
+      Name: !Sub ${NetworkStackName}-LoadBalancer

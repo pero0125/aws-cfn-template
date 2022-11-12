@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: master template describing security group resources
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+
+Resources: 
+# security group
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SecurityGroup1
+      GroupDescription: for xxx application
+      VpcId: !ImportValue
+        Fn::Sub: ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - FromPort: 80
+          IpProtocol: tcp
+          SourceSecurityGroupId: !Ref 'ElbSecurityGroup'
+          ToPort: 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-EC2-SecurityGroup
+
+  ElbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SecurityGroup
+      GroupDescription: for xxx loadbalancer
+      VpcId: !ImportValue
+        Fn::Sub: ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub ${NetworkStackName}-ELB-SecurityGroup
+
+Outputs:
+  Ec2SecurityGroupId:
+    Description: EC2 application security group id
+    Value: !Ref Ec2SecurityGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-EC2-SecurityGroup
+
+  ElbSecurityGroupId:
+    Description: ELB application security group id
+    Value: !Ref ElbSecurityGroup
+    Export: 
+      Name: !Sub ${NetworkStackName}-ELB-SecurityGroup

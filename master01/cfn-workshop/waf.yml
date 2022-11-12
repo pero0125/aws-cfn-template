@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: the template waf 
+
+Resources:
+  # web acl with waf
+  WAFv2WebACL:
+    Type: "AWS::WAFv2::WebACL"
+    Properties:
+      Name: "for-waf"
+      Description: "for-waf-description"
+      DefaultAction: 
+        Allow: {}
+      VisibilityConfig: 
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: "for-waf"
+      Scope: "CLOUDFRONT"
+      Rules: 
+        - Name: "AWS-AWSManagedRulesSQLiRuleSet"
+          Priority: 0
+          OverrideAction: 
+            None: {}
+          Statement: 
+            ManagedRuleGroupStatement: 
+              VendorName: "AWS"
+              Name: "AWSManagedRulesSQLiRuleSet"
+          VisibilityConfig: 
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: "AWS-AWSManagedRulesSQLiRuleSet"
+        - Name: "AWS-AWSManagedRulesWordPressRuleSet"
+          Priority: 1
+          OverrideAction: 
+            None: {}
+          Statement: 
+            ManagedRuleGroupStatement: 
+              VendorName: "AWS"
+              Name: "AWSManagedRulesWordPressRuleSet"
+          VisibilityConfig: 
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: "AWS-AWSManagedRulesWordPressRuleSet"
+  # IPset to deny access on IP-based rules.
+  WAFv2IPSet:
+    Type: "AWS::WAFv2::IPSet"
+    Properties:
+      Name: "deny-test"
+      Description: test
+      IPAddressVersion: "IPV4"
+      Addresses: 
+        - "116.82.78.129/32"
+      Scope: "CLOUDFRONT"

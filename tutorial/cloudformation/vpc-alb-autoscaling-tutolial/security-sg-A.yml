@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "this file for security"
+# Metadata:
+
+Parameters: 
+  PJPrefix:
+    Type: !ImportValue Prefix
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  webserverSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: web-sg-cf 
+      GroupDescription: web server sg
+      VpcId: !ImportValue VpcFromA
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0          
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-webserver-sg"
+
+Outputs:
+  webserverSG:
+    Value: !Ref webserverSG
+    Export:
+      Name: webserverSG

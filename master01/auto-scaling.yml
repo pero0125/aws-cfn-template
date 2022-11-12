@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: this is auto-scaling template
+
+Parameters: 
+  NetworkStackName:
+    Description: The name of the CloudFormation stack you created for network resources.
+    Type: String
+    Default: test
+    AllowedPattern: ^[a-zA-Z]{1}[a-zA-Z0-9-]*$
+    MaxLength: 128
+    MinLength: 1
+  
+  LatestAmiId:
+    Description: the ID of the region-specific AMI 
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  InstanceType:
+    Description: Amazon EC2 instance type to use for your instances.
+    Type: String
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.micro
+      - t3.small
+      - t3.medium
+    Default: t2.micro
+
+Resources: 
+  # Auto-scaling group
+  AutoScalingGroup:
+    CreationPolicy:
+      ResourceSignal:
+        Count: 2
+        Timeout: PT05M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: 1
+        MinInstancesInService: 2
+        PauseTime: PT05M
+        WaitOnResourceSignals: true
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      DesiredCapacity: 2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref 'LaunchTemplate'
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: 4
+      MinSize: 2
+      TargetGroupARNs:
+        - !ImportValue 
+            Fn::Sub: ${NetworkStackName}-ElbTargetGroup
+      VPCZoneIdentifier:
+        - !ImportValue
+            Fn::Sub: ${NetworkStackName}-Private1Subnet
+        - !ImportValue
+          Fn::Sub: ${NetworkStackName}-Private2Subnet
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: true
+          Value: !Sub ${NetworkStackName}-auto-scaling-group
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Metadata:
+      Comment: install a simple web app
+      AWS::CloudFormation::Init:
+        configSets:
+          install:
+            - install_cfn_hup
+            - install_packages
+            - configure
+        configure:
+          files:
+            /var/www/html/index.html:
+              content: htmltest
+              group: root
+              mode: "000644"
+              owner: root
+        install_cfn_hup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                interval=2
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              group: root
+              mode: "000400"
+              owner: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.LaunchTemplate.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchTemplate --configsets install --region ${AWS::Region}
+              group: root
+              mode: "000400"
+              owner: root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        install_packages:
+          packages:
+            yum:
+              httpd: []
+          services:
+            sysvinit:
+              httpd:
+                enabled: true
+                ensureRunning: true
+    Properties:
+      LaunchTemplateName: launch-template
+      LaunchTemplateData:
+        ImageId: !Ref 'LatestAmiId'
+        InstanceType: !Ref 'InstanceType'
+        SecurityGroupIds:
+          - !ImportValue 
+            Fn::Sub: ${NetworkStackName}-EC2-SecurityGroup
+        UserData: !Base64
+          Fn::Sub: |
+            #!/bin/bash
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchTemplate --configsets install --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
+      TagSpecifications:
+        - ResourceType: launch-template
+          Tags:
+            - Key: Name
+              Value: !Sub ${NetworkStackName}-LaunchTemplate

@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "for ec2-launch template of auto scaling, alb"
+Metadata: 
+
+Parameters: 
+  PJPrefix:
+    Type: !ImportValue Prefix
+  InstanceType:
+    Type: "String"
+    Default: "t2.micro"
+    AllowedValues: [
+        "t1.micro",
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "m1.small",
+        "m1.medium",
+        "m1.large",
+        "m1.xlarge",
+        "m2.xlarge",
+        "m2.2xlarge",
+        "m2.4xlarge",
+        "m3.medium",
+        "m3.large",
+        "m3.xlarge",
+        "m3.2xlarge",
+        "c1.medium",
+        "c1.xlarge",
+        "c3.large",
+        "c3.xlarge",
+        "c3.2xlarge",
+        "c3.4xlarge",
+        "c3.8xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge",
+        "g2.2xlarge",
+        "r3.large",
+        "r3.xlarge",
+        "r3.2xlarge",
+        "r3.4xlarge",
+        "r3.8xlarge",
+        "i2.xlarge",
+        "i2.2xlarge",
+        "i2.4xlarge",
+        "i2.8xlarge",
+        "d2.xlarge",
+        "d2.2xlarge",
+        "d2.4xlarge",
+        "d2.8xlarge",
+        "hi1.4xlarge",
+        "hs1.8xlarge",
+        "cr1.8xlarge",
+        "cc2.8xlarge",
+        "cg1.4xlarge",
+    ]
+    ConstraintDescription: "must be a valid EC2 instance type"
+  keyname:
+    Description: "this value is a ec2 key-pair" 
+    Type: AWS::EC2::KeyPair::KeyName
+
+Mappings: 
+
+Conditions: 
+
+Resources:
+# ----------------------
+# launch template
+# ----------------------
+  EC2InstanceLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${PJPrefix}-web-server-template"
+      LaunchTemplateData: 
+        InstanceType: !Ref InstanceType
+        Keyname: !Ref Keyname
+        SecurityGroupIds:
+          - !ImportValue webserverSG
+        UserData: 
+          Fn::Base64: |
+            #!/bin/bash
+            sudo yum -y update
+            sudo yum -y install httpd
+            sudo systemctl start httpd.service
+            sudo systemctl enable httpd.service
+# ----------------------
+# target group
+# ----------------------
+  TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: !ImportValue VpcFromA
+      Name: !Sub "${PJPrefix}-target-group"
+      # ターゲットにトラフィックをルーティングするために使用するプロトコル
+      Protocol: HTTP
+      Port: 80
+      # ターゲットでヘルスチェックを実行するときにロードバランサーが使用するプロトコル
+      HealthCheckProtocol: HTTP
+      # ヘルスチェックのターゲットの送信先である
+      HealthCheckPath: "/"
+      # ターゲットでヘルスチェックを実行するときにロードバランサーが使用するポート
+      HealthCheckPort: "traffic-port"
+      # 非正常なインスタンスが正常であると見なすまでに必要なヘルスチェックの連続成功回数
+      HealthyThresholdCount: 2
+      # ターゲットが異常であると見なされるまでに必要なヘルスチェックの連続失敗回数
+      UnhealthyThresholdCount: 2
+      # ヘルスチェックを失敗と見なす、ターゲットからレスポンスがない時間
+      HealthCheckTimeoutSeconds: 5
+      # 個々のターゲットのヘルスチェックの概算間隔 
+      HealthCheckIntervalSeconds: 10
+      # ターゲットからの正常なレスポンスを確認するために使用する HTTP コード
+      Matcher: 
+        HttpCode: 200
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-tg"
+        
+
+Outputs:
